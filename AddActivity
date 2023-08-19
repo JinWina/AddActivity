@@ -1,586 +1,730 @@
-package com.example.counterapp
+package com.example.uscount
 
+// Import statements indicate which libraries and classes the current class relies on.
+import android.app.Activity
 import android.app.AlertDialog
 import android.app.DatePickerDialog
 import android.app.Dialog
 import android.app.TimePickerDialog
+import android.content.Context
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Point
+import android.graphics.drawable.AnimationDrawable
+import android.net.Uri
+import android.nfc.Tag
+import java.text.SimpleDateFormat
+import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.view.LayoutInflater
+import android.provider.MediaStore
+import android.util.Log
+import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
+import android.view.Window
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.DatePicker
 import android.widget.EditText
-import android.widget.TimePicker
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
-import com.example.counterapp.databinding.ActivityAddBinding
-import java.text.SimpleDateFormat
-import java.util.*
-import android.widget.Switch
+import android.widget.ImageButton
+import android.widget.NumberPicker
+import android.widget.ProgressBar
+import android.widget.RatingBar
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.TimePicker
 import android.widget.Toast
 import androidx.appcompat.widget.SwitchCompat
-import com.android.volley.AuthFailureError
-import com.android.volley.Request
-import com.android.volley.Response
-import com.android.volley.toolbox.StringRequest
-import com.android.volley.toolbox.Volley
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.textfield.TextInputEditText
-import android.widget.RatingBar
-import android.util.Log
-import android.view.Window
-import android.widget.NumberPicker
+import com.google.firebase.FirebaseApp
+import com.google.firebase.database.FirebaseDatabase
+import java.util.Calendar
+import java.util.Locale
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.ktx.storage
+import java.io.File
 
+import java.util.Date
+import java.util.UUID
+private val TAG = "GalleryFragment"
 
-class AddActivity : AppCompatActivity(), TimePickerDialog.OnTimeSetListener,
-    DatePickerDialog.OnDateSetListener {
-
-    lateinit var notetextbox: EditText
-    lateinit var btnSave: Button
-    private var selectedPositions = mutableSetOf<Int>() // Keep track of selected positions
-    private val selectedPosLabels = mutableListOf<String>()
-    private val selectedActLabels = mutableListOf<String>()
-
-    private lateinit var posCircleItemAdapter: CircleItemAdapter
-    private lateinit var actCircleItemAdapter: CircleItemAdapter
-    private var selectedLocations = mutableListOf<String>()
-    private var _binding: ActivityAddBinding? = null
-    private val binding get() = _binding!!
-    private val spinnerOptions = arrayOf("text 1", "text 2", "text 3")
-    private val locationIconList = listOf(
-        CircleIcon(R.drawable.location_bed, "Bed"),
-        CircleIcon(R.drawable.location_sofa, "Sofa"),
-        CircleIcon(R.drawable.location_table, "Table"),
-        CircleIcon(R.drawable.location_chair, "Chair"), // Corrected label for the fourth icon
-        CircleIcon(R.drawable.location_shower, "Shower")
-        // Add more CircleIcon objects here if needed
-    )
-
-    private val posCircleIconList = listOf(
-        CircleIcon(R.drawable.pos_1, "Pos 1"),
-        CircleIcon(R.drawable.pos_2, "Pos 2"),
-        CircleIcon(R.drawable.pos_3, "Pos 3"),
-        CircleIcon(R.drawable.pos_4, "Pos 4"),
-        CircleIcon(R.drawable.pos_5, "Pos 5"),
-        CircleIcon(R.drawable.pos_6, "Pos 6")
-        // Add more CircleIcon objects here if needed
-    )
-    private val actCircleIconList = listOf(
-        CircleIcon(R.drawable.pos_7, "זיון"),
-        CircleIcon(R.drawable.act_suck, "מציצה"),
-        CircleIcon(R.drawable.act_assfinger_men, "אצבע בטוסיק לדין"),
-        CircleIcon(R.drawable.act_assfinger_women, "אצבע בטוסיק לולנטינה"),
-        CircleIcon(R.drawable.act_ass_lick_men, "ליקוק טוסיק דין"),
-        CircleIcon(R.drawable.act_women_ass_lick, "ליקוק טוסיק ולנטינה"),
-        CircleIcon(R.drawable.act_pee, "השתנה")
-    )
-    private lateinit var circleItemAdapter: CircleItemAdapter
-    // Add these variables to store the selected time and date
-    private var selectedTime: Calendar = Calendar.getInstance()
-    private var selectedDate: Calendar = Calendar.getInstance()
-    private var switchGmiraD: SwitchCompat? = null
-    private var spinnerGmiraD: Spinner? = null
-    private var switchGmiraV: SwitchCompat? = null
-    private var spinnerGmiraV: Spinner? = null
+// This is the declaration of your activity class. It's named "AddActivity" and is a subtype of "AppCompatActivity".
+// It also implements the "TimePickerDialog.OnTimeSetListener" interface to respond to time being set in a time picker dialog.
+class AddActivity : AppCompatActivity(), CircleItemAdapter.OnItemClickListener, TimePickerDialog.OnTimeSetListener, DatePickerDialog.OnDateSetListener {
+    // Uri to store the image's uri after selection
+    // onCreate is a lifecycle method that's called when the activity is first created.
+    // All the initial setup for the activity happens here.
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        _binding = ActivityAddBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        super.onCreate(savedInstanceState) // Call the superclass's version of onCreate.
+        // Only one call to setContentView
+        setContentView(R.layout.activity_add)
 
-        setupRecyclerView()
+        // Retrieve the passed date to AddActivity
+        val selectedDate = intent.getLongExtra("selectedDate", System.currentTimeMillis())
+        val calendar = Calendar.getInstance()
+        calendar.timeInMillis = selectedDate
 
-        // ...
+        // Assuming you have an EditText or TextView for displaying the date and time
+        val dateTextInputEditText = findViewById<EditText>(R.id.dateTextInputEditText)
+        val timeTextInputEditText = findViewById<EditText>(R.id.timeTextInputEditText)
 
-        // Pass the selected positions to the adapter when initializing
-        circleItemAdapter.setSelectedPositions(selectedPositions)
+        // SimpleDateFormat for date and time
+        val sdfDate = SimpleDateFormat("dd/MM/yy", Locale.getDefault())
+        val sdfTime = SimpleDateFormat("HH:mm", Locale.getDefault())
 
-        val timeTextInputEditText = findViewById<TextInputEditText>(R.id.timeTextInputEditText)
-        timeTextInputEditText.setOnClickListener {
-            showTimePickerDialog()
+        dateTextInputEditText.setText(sdfDate.format(calendar.time))
+        timeTextInputEditText.setText(sdfTime.format(calendar.time))
+
+        // AddActivity Resize Dialog
+        val window = this.window
+        val size = Point()
+        val display = window!!.windowManager.defaultDisplay
+        display.getSize(size)
+
+        val width = (size.x * 1.0).toInt()
+        val height = (size.y * 0.8).toInt()
+
+        window.setLayout(width, height)
+        window.setGravity(Gravity.CENTER)
+
+        // Switch Button to Spinner - GmiraD GmiraV
+        val gmiraVSwitch = findViewById<SwitchCompat>(R.id.GmiraVSwitch)
+        val gmiraVSpinner = findViewById<Spinner>(R.id.GmiraVSpinner)
+        gmiraVSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                // If the switch is turned ON
+                gmiraVSpinner.visibility = View.VISIBLE
+            } else {
+                // If the switch is turned OFF
+                gmiraVSpinner.visibility = View.INVISIBLE
+            }
+
+// Get the array from resources
+            val spinnerItems = resources.getStringArray(R.array.spinner_GmiraV)
+
+// Create an ArrayAdapter using the custom layout
+            val adapter = ArrayAdapter(this, R.layout.custom_spinner_item, spinnerItems)
+
+// Apply the adapter to the Spinner
+            gmiraVSpinner.adapter = adapter
         }
-
-        val dateTextInputEditText = findViewById<TextInputEditText>(R.id.dateTextInputEditText)
-        dateTextInputEditText.setOnClickListener {
-            showDatePickerDialog()
-        }
-        // Initialize the spinners first
-        var spinnerGmiraD: Spinner = findViewById(R.id.GmiraDSpinner)
-        var spinnerGmiraV: Spinner = findViewById(R.id.GmiraVSpinner)
-
-// Then assign their selected items to the variables
-        var selectedGmiraDItem: String = spinnerGmiraD.selectedItem.toString()
-        var selectedGmiraVItem: String = spinnerGmiraV.selectedItem.toString()
 
         val gmiraDSwitch = findViewById<SwitchCompat>(R.id.GmiraDSwitch)
-        val gmiraVSwitch = findViewById<SwitchCompat>(R.id.GmiraVSwitch)
-
-// ...
-
-
-        val protectionSwitch: SwitchCompat = findViewById(R.id.ProtactionSwitch)
-        val toySwitch: SwitchCompat = findViewById(R.id.ToySwitch)
-        val customSwitch: SwitchCompat = findViewById(R.id.CustomSwitch)
-        val ziunopolySwitch: SwitchCompat = findViewById(R.id.ZiunopolySwitch)
-        val periodSwitch: SwitchCompat = findViewById(R.id.PeriodSwitch)
-        val watchpornSwitch: SwitchCompat = findViewById(R.id.WatchedPornSwitch)
-        val madepornSwitch: SwitchCompat = findViewById(R.id.PornMadeSwitch)
-        var ratingBar: RatingBar = findViewById(R.id.ratingBar)
+        val gmiraDSpinner = findViewById<Spinner>(R.id.GmiraDSpinner)
+        gmiraDSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                // If the switch is turned ON
+                gmiraDSpinner.visibility = View.VISIBLE
+            } else {
+                // If the switch is turned OFF
+                gmiraDSpinner.visibility = View.INVISIBLE
+            }
 
 
-        spinnerGmiraD.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                selectedGmiraDItem = parent?.getItemAtPosition(position).toString()
+            // When ImageButton is clicked
+            fun onUploadImageClicked(view: View) {
+                val intent = Intent(Intent.ACTION_PICK)
+                intent.type = "image/*"
+                startActivityForResult(intent, 100) // '100' is a request code
+            }
+
+// Get the array from resources
+            val spinnerItems = resources.getStringArray(R.array.spinner_GmiraD)
+
+// Create an ArrayAdapter using the custom layout
+            val adapter = ArrayAdapter(this, R.layout.custom_spinner_item, spinnerItems)
+
+            gmiraDSpinner.adapter = adapter
+
+
+            // Other Choice
+
+            val customGmiraDEditText = findViewById<EditText>(R.id.customGmiraDEditText)
+        }
+
+        val customplaceEditText = findViewById<EditText>(R.id.customplaceEditText)
+        // placeSpinner - spinner pink Color
+        val placeSpinner = findViewById<Spinner>(R.id.placeSpinner)
+
+        val spinnerItems = resources.getStringArray(R.array.spinner_place)
+
+        val adapter = ArrayAdapter(this, R.layout.custom_spinner_item, spinnerItems)
+
+        placeSpinner.adapter = adapter
+
+        val imageButtonUpload: ImageButton = findViewById(R.id.imageButtonUpload)
+        imageButtonUpload.setOnClickListener {
+            openImagePicker()
+        }
+
+
+        val customGmiraDEditText = findViewById<EditText>(R.id.customGmiraDEditText)
+        gmiraDSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                val selectedItem = parent?.getItemAtPosition(position).toString()
+
+                if (selectedItem == "Other") {
+                    customGmiraDEditText.visibility = View.VISIBLE
+                } else {
+                    customGmiraDEditText.visibility = View.GONE
+                }
             }
 
             override fun onNothingSelected(parent: AdapterView<*>?) {
-                // Optionally handle the case where nothing is selected
+                // This callback is invoked when no item is selected.
+                // You can leave this empty if you don't need to handle this event.
             }
         }
 
-        spinnerGmiraV.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                selectedGmiraVItem = parent?.getItemAtPosition(position).toString()
+        val customGmiraVEditText = findViewById<EditText>(R.id.customGmiraVEditText)
+        gmiraVSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                val selectedItem = parent?.getItemAtPosition(position).toString()
+
+                if (selectedItem == "Other") {
+                    customGmiraVEditText.visibility = View.VISIBLE
+                } else {
+                    customGmiraVEditText.visibility = View.GONE
+                }
             }
 
             override fun onNothingSelected(parent: AdapterView<*>?) {
-                // Optionally handle the case where nothing is selected
+                // This callback is invoked when no item is selected.
+                // You can leave this empty if you don't need to handle this event.
             }
         }
 
-
-        // Set up the adapter and RecyclerView for PosRecyclerView
-        binding.PosRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        posCircleItemAdapter = CircleItemAdapter(this, posCircleIconList)
-        binding.PosRecyclerView.adapter = posCircleItemAdapter
-
-        // Set up the adapter and RecyclerView for ActRecyclerView
-        binding.ActRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        actCircleItemAdapter = CircleItemAdapter(this, actCircleIconList)
-        binding.ActRecyclerView.adapter = actCircleItemAdapter
-
-        // Set up the click listener for PosRecyclerView
-        posCircleItemAdapter.setOnItemClickListener(object : CircleItemAdapter.OnItemClickListener {
-            override fun onItemClick(position: Int, selectedLabels: List<String>) {
-                // Update the selectedPosLabels list with the selected labels
-                selectedPosLabels.clear()
-                selectedPosLabels.addAll(selectedLabels)
-            }
-        })
-
-        // Set up the click listener for ActRecyclerView
-        actCircleItemAdapter.setOnItemClickListener(object : CircleItemAdapter.OnItemClickListener {
-            override fun onItemClick(position: Int, selectedLabels: List<String>) {
-                // Update the selectedActLabels list with the selected labels
-                selectedActLabels.clear()
-                selectedActLabels.addAll(selectedLabels)
-            }
-        })
-
-        circleItemAdapter.setOnItemClickListener(object : CircleItemAdapter.OnItemClickListener {
-            override fun onItemClick(position: Int, selectedLabels: List<String>) {
-                // Update the selected locations list with the selected labels
-                selectedLocations.clear()
-                selectedLocations.addAll(selectedLabels)
-
-                // Notify the adapter about the changed item
-                circleItemAdapter.notifyDataSetChanged()
-            }
-        })
-// ...
-
-
-        fun parseDate(date: String): Calendar {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val cal = Calendar.getInstance()
-            cal.time = sdf.parse(date)
-            return cal
-        }
-
-        fun parsePositions(positions: String): MutableSet<Int> {
-            // Assuming the positions are saved as a comma separated string
-            return positions.split(", ").map { it.toInt() }.toMutableSet()
-        }
-
-
-        fun populateFields(document: DocumentSnapshot) {
-            val data = document.data
-            if (data != null) {
-                // Now you can access the field values and populate the UI.
-                // Make sure to check if the field exists before trying to access it.
-
-                if (data.contains("selectedDate")) {
-                    // Assuming `parseDate` is a function that converts the string date to a Calendar object
-                    selectedDate = parseDate(data["selectedDate"] as String)
-                }
-                if (data.contains("selectedPositions")) {
-                    // Assuming `parsePositions` is a function that converts the string positions to a List<Int> or Set<Int> (according to your implementation)
-                    selectedPositions = parsePositions(data["selectedPositions"] as String)
-                }
-                // And so on for the rest of your fields...
-            }
-        }
-
-
-
-
-
-
-
-        notetextbox = findViewById(R.id.notetextbox)
-        btnSave = findViewById(R.id.btnSave)
-
-        btnSave.setOnClickListener {
-
-            val durationTextView: TextView = findViewById(R.id.durationTextView)
-            val duration = durationTextView.text.toString()
-
-            if (selectedLocations.isEmpty()) {
-                Toast.makeText(this@AddActivity, "Select at least one location", Toast.LENGTH_SHORT)
-                    .show()
-            } else {
-                // Show the "Marked as Yes" toast message here
-                Toast.makeText(this@AddActivity, "Saved", Toast.LENGTH_SHORT).show()
-                val ratingValue: Float = ratingBar.rating
-                // Send the network request to save the data to the server
-                Log.d(
-                    "Debug",
-                    "Locations before sending: ${
-                        circleItemAdapter.getSelectedLabels().joinToString(", ")
-                    }"
-                )
-                Log.d("Debug", "Positions before sending: ${selectedPosLabels.joinToString(", ")}")
-                Log.d("Debug", "Activities before sending: ${selectedActLabels.joinToString(", ")}")
-
-                val data = hashMapOf(
-                    "selectedDate" to SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(
-                        selectedDate.time
-                    ),
-
-                    "currentTime" to timeTextInputEditText.text.toString(),
-                    "duration" to duration,
-                    "locationSelected" to circleItemAdapter.getSelectedLabels().joinToString(", "),
-                    "selectedPositions" to selectedPosLabels.joinToString(", "),
-                    "selectedActivities" to selectedActLabels.joinToString(", "),
-                    "selectedGmiraD" to if (gmiraDSwitch.isChecked) selectedGmiraDItem else "None",
-                    "selectedGmiraV" to if (gmiraVSwitch.isChecked) selectedGmiraVItem else "None",
-                    "protectionSwitchState" to if (protectionSwitch.isChecked) "Yes" else "No",
-                    "toySwitchState" to if (toySwitch.isChecked) "Yes" else "No",
-                    "customSwitchState" to if (customSwitch.isChecked) "Yes" else "No",
-                    "ziunopolySwitchState" to if (ziunopolySwitch.isChecked) "Yes" else "No",
-                    "periodSwitchState" to if (periodSwitch.isChecked) "Yes" else "No",
-                    "watchpornSwitchState" to if (watchpornSwitch.isChecked) "Yes" else "No",
-                    "madepornSwitchState" to if (madepornSwitch.isChecked) "Yes" else "No",
-                    "ratingValue" to ratingValue.toString(),
-                    "note" to notetextbox.text.toString() // Use "itemName" instead of "bookName"
-                )
-
-
-                Log.d("Debug", "Data before sending: $data")
-
-                val db = FirebaseFirestore.getInstance()
-                val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(selectedDate.time)
-
-                fun trySaveData(suffix: Int) {
-                    val documentId = if (suffix == 0) date else "$date($suffix)"
-                    db.collection("Counter").document(documentId).get()
-                        .addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                val document = task.result
-                                if (document != null && document.exists()) {
-                                    trySaveData(suffix + 1) // if document exists, increase suffix and try again
-                                } else {
-                                    // if document doesn't exist, save it
-                                    db.collection("Counter").document(documentId).set(data)
-                                        .addOnSuccessListener {
-                                            Log.d("Debug", "DocumentSnapshot successfully written!")
-                                            val intent =
-                                                Intent(this@AddActivity, MainActivity::class.java)
-                                            startActivity(intent)
-                                            finish()
-                                        }
-                                        .addOnFailureListener { e ->
-                                            Log.w("Debug", "Error adding document", e)
-                                            Toast.makeText(
-                                                this@AddActivity,
-                                                "Failed to save",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
-                                }
-                            } else {
-                                Log.d("Debug", "get failed with ", task.exception)
-                            }
-                        }
-                }
-
-// Call the function initially with suffix 0
-                trySaveData(0)
-            }
-        }
-
-
-
-                fun getSelectedLocations(): List<String> {
-            return locationIconList.filter { it.selected }.map { it.label }
-        }
-
-         fun setupRecyclerView() {
-            circleItemAdapter = CircleItemAdapter(this, locationIconList)
-            binding.locationRecyclerView.adapter = circleItemAdapter
-
-             circleItemAdapter.setOnItemClickListener(object : CircleItemAdapter.OnItemClickListener {
-                 override fun onItemClick(position: Int, selectedLabels: List<String>) {
-                     // Update the selected locations list with the selected labels
-                     selectedLocations.clear()
-                     selectedLocations.addAll(selectedLabels)
-
-                     // Notify the adapter about the changed item
-                     circleItemAdapter.notifyDataSetChanged()
-                 }
-             })
-
-
-            binding.locationRecyclerView.layoutManager = LinearLayoutManager(this)
-        }
-
-
-
-            // Pass the selected positions to the adapter when initializing
-            circleItemAdapter.setSelectedPositions(selectedPositions)
-        }
-
-    private fun setupRecyclerView() {
-        circleItemAdapter = CircleItemAdapter(this, locationIconList)
-        binding.locationRecyclerView.adapter = circleItemAdapter
-
-        circleItemAdapter.setOnItemClickListener(object : CircleItemAdapter.OnItemClickListener {
-            override fun onItemClick(position: Int, selectedPositions: List<String>) {
-                // Update the selectedPositions set whenever an item is clicked in the adapter
-                this@AddActivity.selectedPositions.clear()
-                this@AddActivity.selectedPositions.addAll(selectedPositions.map { label -> locationIconList.indexOfFirst { it.label == label } })
-            }
-        })
-
-        binding.locationRecyclerView.layoutManager = LinearLayoutManager(this)
-
-
-
-
-
-
-
-
-         fun onDateSet(view: DatePicker?, year: Int, month: Int, dayOfMonth: Int) {
-            selectedDate.set(Calendar.YEAR, year)
-            selectedDate.set(Calendar.MONTH, month)
-            selectedDate.set(Calendar.DAY_OF_MONTH, dayOfMonth)
-
-            val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-            val formattedDate = dateFormat.format(selectedDate.time)
-            binding.dateTextInputEditText.setText(formattedDate)
-
-            // Also, you can save the selectedDate to use later when sending the data to Google Sheets
-        }
-
-        // Implement the onTimeSet callback
-         fun onTimeSet(view: TimePicker?, hourOfDay: Int, minute: Int) {
-            selectedTime.set(Calendar.HOUR_OF_DAY, hourOfDay)
-            selectedTime.set(Calendar.MINUTE, minute)
-
-            val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-            val formattedTime = timeFormat.format(selectedTime.time)
-            binding.timeTextInputEditText.setText(formattedTime)
-
-            // Also, you can save the selectedTime to use later when sending the data to Google Sheets
-        }
-
-        // Initialize the RecyclerView and set the CircleItemAdapter
-        val locationRecyclerView: RecyclerView = findViewById(R.id.locationRecyclerView)
-        circleItemAdapter = CircleItemAdapter(this, locationIconList)
-        locationRecyclerView.adapter = circleItemAdapter
-
-
-        val backgroundDrawable = ContextCompat.getDrawable(this, R.drawable.bg_rounded)
-        binding.root.background = backgroundDrawable
-
-        // Find the TextView in your layout
-        val durationTextView = binding.durationTextView
-
-        // Set the click listener for the TextView to open the dialog
-        durationTextView.setOnClickListener {
-            // Create the dialog builder
-            val builder = AlertDialog.Builder(this)
-
-            // Set your custom theme to the dialog
-            builder.context.setTheme(R.style.CustomDialogTheme)
-
-            // Set dialog content and other properties
-            builder.setTitle("Custom Dialog")
-                .setMessage("This is a custom dialog.")
-                .setPositiveButton("OK", null)
-
-            // Show the dialog
-            val dialog = builder.create()
-            dialog.show()
-        }
-
-        // Initialize the switch and spinner references
-        switchGmiraD = binding.GmiraDSwitch
-        spinnerGmiraD = binding.GmiraDSpinner
-        switchGmiraV = binding.GmiraVSwitch
-        spinnerGmiraV = binding.GmiraVSpinner
-
-        val spinnerGmiraDArray = resources.getStringArray(R.array.spinner_GmiraD)
-        val spinnerAdapterGmiraD = ArrayAdapter(
-            this,
-            R.layout.custom_spinner_item,
-            spinnerGmiraDArray
+        // CircleIconRecyclerView
+
+        val recyclerView = findViewById<RecyclerView>(R.id.locationRecyclerView)
+        recyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        // Set your adapter
+        val locationIconList = listOf(
+            CircleIcon(R.drawable.location_bed, "Bed"),
+            CircleIcon(R.drawable.location_sofa, "Sofa"),
+            CircleIcon(R.drawable.location_table, "Table"),
+            CircleIcon(R.drawable.location_chair, "Chair"), // Corrected label for the fourth icon
+            CircleIcon(R.drawable.location_shower, "Shower"),
+            CircleIcon(R.drawable.location_ball, "Ball"),
+            CircleIcon(R.drawable.location_trx, "TRX")
+            // Add more CircleIcon objects here if needed
         )
-        spinnerAdapterGmiraD.setDropDownViewResource(R.layout.custom_spinner_item)
-        binding.GmiraDSpinner.adapter = spinnerAdapterGmiraD
+        val circleItemAdapter = CircleItemAdapter(this, locationIconList)
+        recyclerView.adapter = circleItemAdapter
 
-        val spinnerGmiraVArray = resources.getStringArray(R.array.spinner_GmiraV)
-        val spinnerAdapterGmiraV = ArrayAdapter(
-            this,
-            R.layout.custom_spinner_item,
-            spinnerGmiraVArray
+        val posRecyclerView = findViewById<RecyclerView>(R.id.PosRecyclerView)
+        posRecyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        val posCircleIconList = listOf(
+            CircleIcon(R.drawable.pos_1, "Pos 1"),
+            CircleIcon(R.drawable.pos_2, "Pos 2"),
+            CircleIcon(R.drawable.pos_3, "Pos 3"),
+            CircleIcon(R.drawable.pos_4, "Pos 4"),
+            CircleIcon(R.drawable.pos_5, "Pos 5"),
+            CircleIcon(R.drawable.pos_6, "Pos 6")
+            // Add more CircleIcon objects here if needed
         )
-        spinnerAdapterGmiraV.setDropDownViewResource(R.layout.custom_spinner_item)
-        binding.GmiraVSpinner.adapter = spinnerAdapterGmiraV
-
-        // Set an OnCheckedChangeListener on the Switch
-        switchGmiraD?.setOnCheckedChangeListener { _, isChecked ->
-            // If the switch is checked (ON), make the Spinner visible
-            // Otherwise, hide the Spinner
-            if (isChecked) {
-                spinnerGmiraD?.visibility = View.VISIBLE
-            } else {
-                spinnerGmiraD?.visibility = View.GONE
-            }
-        }
-
-        switchGmiraV?.setOnCheckedChangeListener { _, isChecked ->
-            // If the switch is checked (ON), make the Spinner visible
-            // Otherwise, hide the Spinner
-            if (isChecked) {
-                spinnerGmiraV?.visibility = View.VISIBLE
-            } else {
-                spinnerGmiraV?.visibility = View.GONE
-            }
-        }
-
-        // Set a listener on the GmiraD spinner to show/hide the spinner based on its state
-
-//...
-
-
-
-
-        // Set an OnClickListener on the duration text view to show the duration picker dialog
-        binding.durationTextView.setOnClickListener {
-            showDurationPickerDialog()
-        }
-
-        // Set up the adapter and RecyclerView for locationRecyclerView
-
-        // Set up the adapter and RecyclerView for locationRecyclerView
-        binding.locationRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        circleItemAdapter = CircleItemAdapter(this, locationIconList)
-        binding.locationRecyclerView.adapter = circleItemAdapter
-
-// Set up the adapter and RecyclerView for posRecyclerView
-        binding.PosRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         val posCircleItemAdapter = CircleItemAdapter(this, posCircleIconList)
-        binding.PosRecyclerView.adapter = posCircleItemAdapter
+        posRecyclerView.adapter = posCircleItemAdapter
 
-        // Set up the adapter and RecyclerView for posRecyclerView
-        val actRecyclerView: RecyclerView = binding.ActRecyclerView
-        actRecyclerView.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        val actRecyclerView = findViewById<RecyclerView>(R.id.ActRecyclerView)
+        actRecyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        val actCircleIconList = listOf(
+            CircleIcon(R.drawable.pos_7, "זיון"),
+            CircleIcon(R.drawable.act_vagi, "ליקוק"),
+            CircleIcon(R.drawable.act_suck, "מציצה"),
+            CircleIcon(R.drawable.act_assfinger_men, "אצבע בטוסיק לדין"),
+            CircleIcon(R.drawable.act_assfinger_women, "אצבע בטוסיק לולנטינה"),
+            CircleIcon(R.drawable.act_ass_lick_men, "ליקוק טוסיק דין"),
+            CircleIcon(R.drawable.act_women_ass_lick, "ליקוק טוסיק ולנטינה"),
+            CircleIcon(R.drawable.act_pee, "השתנה")
+        )
         val actCircleItemAdapter = CircleItemAdapter(this, actCircleIconList)
         actRecyclerView.adapter = actCircleItemAdapter
 
-        val currentTime = Calendar.getInstance()
-        val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-        val formattedTime = timeFormat.format(currentTime.time)
-        binding.timeTextInputEditText.setText(formattedTime)
+        val proRecyclerView = findViewById<RecyclerView>(R.id.ProRecyclerView)
+        proRecyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        val proCircleIconList = listOf(
+            CircleIcon(R.drawable.pro_none, "None"),
+            CircleIcon(R.drawable.pro_pill, "Pill"),
+            CircleIcon(R.drawable.pro_condom, "Condom"),
+            CircleIcon(R.drawable.pro_gloves, "Gloves"),
 
-        val currentDate = Calendar.getInstance()
-        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-        val formattedDate = dateFormat.format(currentDate.time)
-        binding.dateTextInputEditText.setText(formattedDate)
+            )
+        val proCircleItemAdapter = CircleItemAdapter(this, proCircleIconList)
+        proRecyclerView.adapter = proCircleItemAdapter
 
-        binding.timeTextInputEditText.setOnClickListener {
+
+        val placeRecyclerView = findViewById<RecyclerView>(R.id.placeRecyclerView)
+        placeRecyclerView.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        val placeCircleIconList = listOf(
+            CircleIcon(R.drawable.ms_house, "Home"),
+            CircleIcon(R.drawable.ms_outdoors, "Outdoors")
+
+        )
+        val placeCircleItemAdapter = CircleItemAdapter(this, placeCircleIconList, false)
+        placeRecyclerView.adapter = placeCircleItemAdapter
+        placeCircleItemAdapter.setOnItemClickListener(this) // Here's where you set the listener
+
+        // Time/Date/Duration set up
+
+
+        // Get a reference to the TextInputEditText widget in the layout.
+        // Set a click listener on the TextInputEditText. When it's clicked, the showTimePickerDialog function is called.
+        timeTextInputEditText.setOnClickListener {
             showTimePickerDialog()
         }
-
-        binding.dateTextInputEditText.setOnClickListener {
+        // Initialize the date input text field
+        // Set a click listener on the date input text field to show the date picker dialog
+        dateTextInputEditText.setOnClickListener {
             showDatePickerDialog()
+        }  // Set Time/DatePickerDialog
+
+        // Initialize the Duration input
+        val durationTextView: TextView = findViewById(R.id.durationTextView)
+        durationTextView.setOnClickListener {
+            showDurationPickerDialog()
+        }
+
+        // Progress Bar
+        val progressBar = findViewById<ProgressBar>(R.id.progressBar)
+        val animationDrawable = progressBar.indeterminateDrawable as AnimationDrawable
+        animationDrawable.start()
+
+
+// Edit:
+        // Fetching data for Edit operation
+        val db = FirebaseFirestore.getInstance()
+        val documentId = intent.getStringExtra("documentId")
+
+        if (documentId != null) {
+            // Fetch data from Firestore and populate fields
+            val docRef = db.collection("UsCount").document(documentId)
+            docRef.get().addOnSuccessListener { documentSnapshot ->
+                if (documentSnapshot != null) {
+
+                    // Rating bars
+                    val ratingBar: RatingBar = findViewById(R.id.ratingBar)
+                    ratingBar.rating = documentSnapshot.getString("rating")?.toFloatOrNull() ?: 0f
+
+                    // Time, Date and Duration
+                    val timeTextInputEditText: EditText = findViewById(R.id.timeTextInputEditText)
+                    val dateTextInputEditText: EditText = findViewById(R.id.dateTextInputEditText)
+                    val durationTextView: TextView = findViewById(R.id.durationTextView)
+                    timeTextInputEditText.setText(documentSnapshot.getString("Time"))
+                    dateTextInputEditText.setText(documentSnapshot.getString("Date"))
+                    durationTextView.text = documentSnapshot.getString("duration")
+
+                    // Place
+                    // Assuming placeCircleItemAdapter is a custom adapter with a method to set selected labels
+                    placeCircleItemAdapter.setSelectedLabels(documentSnapshot.getString("Place")?.split(", "))
+
+                    // Outdoors Location & Note
+                    val placeSpinner: Spinner = findViewById(R.id.placeSpinner)
+                    val customplaceEditText: EditText = findViewById(R.id.customplaceEditText)
+                    customplaceEditText.setText(documentSnapshot.getString("Outdoors Note"))
+
+                    val outdoorsLocation = documentSnapshot.getString("Outdoors Location")
+                    if (outdoorsLocation != null) {
+                        val spinnerPosition = (placeSpinner.adapter as ArrayAdapter<String>).getPosition(outdoorsLocation)
+                        placeSpinner.setSelection(spinnerPosition)
+                    }
+
+                    // Other CircleItemAdapters
+                    // Similar to PlaceCircleItemAdapter
+                    circleItemAdapter.setSelectedLabels(documentSnapshot.getString("Location")?.split(", "))
+                    posCircleItemAdapter.setSelectedLabels(documentSnapshot.getString("Position")?.split(", "))
+                    actCircleItemAdapter.setSelectedLabels(documentSnapshot.getString("Activity")?.split(", "))
+                    proCircleItemAdapter.setSelectedLabels(documentSnapshot.getString("Protection")?.split(", "))
+
+                    // GmiraD & GmiraV
+                    val gmiraDSwitch: SwitchCompat = findViewById(R.id.GmiraDSwitch)
+                    val customGmiraDEditText: EditText = findViewById(R.id.customGmiraDEditText)
+                    gmiraDSwitch.isChecked = documentSnapshot.getString("GmiraD") != null
+                    customGmiraDEditText.setText(documentSnapshot.getString("GmiraD"))
+
+                    val gmiraVSwitch: SwitchCompat = findViewById(R.id.GmiraVSwitch)
+                    val customGmiraVEditText: EditText = findViewById(R.id.customGmiraVEditText)
+                    gmiraVSwitch.isChecked = documentSnapshot.getString("GmiraV") != null
+                    customGmiraVEditText.setText(documentSnapshot.getString("GmiraV"))
+
+                    // Switches
+                    val toySwitch: SwitchCompat = findViewById(R.id.ToySwitch)
+                    toySwitch.isChecked = documentSnapshot.getString("toy") == "Yes"
+
+                    val customSwitch: SwitchCompat = findViewById(R.id.CustomSwitch)
+                    customSwitch.isChecked = documentSnapshot.getString("custom") == "Yes"
+
+                    val ziunopolySwitch: SwitchCompat = findViewById(R.id.ZiunopolySwitch)
+                    ziunopolySwitch.isChecked = documentSnapshot.getString("ziunopoly") == "Yes"
+
+                    val periodSwitch: SwitchCompat = findViewById(R.id.PeriodSwitch)
+                    periodSwitch.isChecked = documentSnapshot.getString("period") == "Yes"
+
+                    val watchpornSwitch: SwitchCompat = findViewById(R.id.WatchedPornSwitch)
+                    watchpornSwitch.isChecked = documentSnapshot.getString("watchporn") == "Yes"
+
+                    val madepornSwitch: SwitchCompat = findViewById(R.id.PornMadeSwitch)
+                    madepornSwitch.isChecked = documentSnapshot.getString("madeporn") == "Yes"
+
+                    // Note textbox
+                    val notetextbox: EditText = findViewById(R.id.notetextbox)
+                    notetextbox.setText(documentSnapshot.getString("note"))
+                }
+            }
+        }
+
+
+        // Send to FireBase
+
+
+        fun saveData(data: HashMap<String, String?>) {
+            // Show the ProgressBar
+            progressBar.visibility = View.VISIBLE
+            val date = data["Date"] ?: ""
+            val time = data["Time"] ?: ""
+            val formattedDate = date.replace("/", "-")  // Replace / with - to avoid path issues
+
+            // Fetch the current count of activities
+            val db = FirebaseFirestore.getInstance()
+            db.collection("UsCount").document("sessionCounter")
+                .get()
+                .addOnSuccessListener { document ->
+                    var currentCount = document.getLong("count")?.toInt() ?: 0
+                    currentCount++ // Increment by 1 for new activity
+
+                    // Determine the storage path for the image based on the session number
+                    val imageName = "Session $currentCount img.jpg"
+                    val storageRef = FirebaseStorage.getInstance().getReference("images/$imageName")
+                    val file = Uri.fromFile(File("path/to/images/rivers.jpg"))
+
+                    // Upload the image to Firebase Storage with the session-specific name
+                    val uploadTask = storageRef.putFile(selectedImageUri)
+                    uploadTask.addOnSuccessListener {
+                        // Once the image is uploaded, get its download URL
+                        storageRef.downloadUrl.addOnSuccessListener { uri ->
+                            val downloadUrl = uri.toString()
+
+                            // Create the timestamp and the final data map to save to Firestore
+                            val currentTimestamp = FieldValue.serverTimestamp()
+                            val dataToSave = data + hashMapOf(
+                                "image_url_field" to downloadUrl,
+                                "timestamp" to currentTimestamp,
+                                "date_time" to "$date $time"
+                            )
+
+                            // Save this combined data map to Firestore
+                            db.collection("UsCount").document("Session $currentCount")
+                                .set(dataToSave)  // Use the dataToSave map here
+                                .addOnSuccessListener {
+                                    // Hide the ProgressBar
+                                    progressBar.visibility = View.GONE
+
+                                    Toast.makeText(this, "Data saved successfully!", Toast.LENGTH_SHORT)
+                                        .show()
+
+                                    // Update the counter in Firestore
+                                    db.collection("UsCount").document("sessionCounter")
+                                        .set(mapOf("count" to currentCount))
+
+                                    // Navigate to MainActivity
+                                    val intent = Intent(this, MainActivity::class.java)
+                                    startActivity(intent)
+                                    finish()  // Close the current activity
+                                }
+                                .addOnFailureListener { e ->
+                                    // Hide the ProgressBar
+                                    progressBar.visibility = View.GONE
+                                    Log.e("FIRESTORE_ERROR", "Error writing document with ID: Session $currentCount", e)
+                                }
+                        }.addOnFailureListener { e ->
+                            progressBar.visibility = View.GONE
+                            Log.e("STORAGE_ERROR", "Error getting download URL.", e)
+                        }
+                    }.addOnFailureListener { e ->
+                        progressBar.visibility = View.GONE
+                        Log.e("STORAGE_ERROR", "Error uploading image.", e)
+                    }
+                }
+        }
+
+
+
+
+        val saveButton: TextView = findViewById(R.id.btnSave)
+        saveButton.setOnClickListener {
+            Log.d("DEBUG", "Button clicked!")
+            val time = timeTextInputEditText.text.toString()
+            val date = dateTextInputEditText.text.toString()
+            val duration = durationTextView.text.toString()
+
+            if (time.isBlank() || date.isBlank()) {
+                Toast.makeText(this, "Please fill in both time and date.", Toast.LENGTH_SHORT)
+                    .show()
+                return@setOnClickListener  // Exit the listener without proceeding
+            }
+
+            // Start the ProgressBar animation when the save button is clicked
+            val progressBar = findViewById<ProgressBar>(R.id.progressBar)
+            val animationDrawable = progressBar.indeterminateDrawable as AnimationDrawable
+            animationDrawable.start()
+
+            var spinnerGmiraD: Spinner = findViewById(R.id.GmiraDSpinner)
+            var selectedGmiraDItem: String = spinnerGmiraD.selectedItem.toString()
+            var spinnerGmiraV: Spinner = findViewById(R.id.GmiraVSpinner)
+            var selectedGmiraVItem: String = spinnerGmiraV.selectedItem.toString()
+
+            val toySwitch: SwitchCompat = findViewById(R.id.ToySwitch)
+            val customSwitch: SwitchCompat = findViewById(R.id.CustomSwitch)
+            val ziunopolySwitch: SwitchCompat = findViewById(R.id.ZiunopolySwitch)
+            val periodSwitch: SwitchCompat = findViewById(R.id.PeriodSwitch)
+            val watchpornSwitch: SwitchCompat = findViewById(R.id.WatchedPornSwitch)
+            val madepornSwitch: SwitchCompat = findViewById(R.id.PornMadeSwitch)
+            var ratingBar: RatingBar = findViewById(R.id.ratingBar)
+            val ratingValue: Float = ratingBar.rating
+            val notetextbox = findViewById<EditText>(R.id.notetextbox)
+            val editTextValue = customplaceEditText.text.toString()
+            val selectedItem = placeSpinner.selectedItem?.toString()
+            val data = hashMapOf<String, String?>(
+
+                "Time" to time,
+                "Date" to date,
+                "duration" to duration,
+                "Place" to if (placeCircleItemAdapter.getSelectedLabels()
+                        .isNotEmpty()
+                ) placeCircleItemAdapter.getSelectedLabels().joinToString(", ") else null,
+                "Outdoors Location" to if (placeSpinner.visibility == View.VISIBLE && !selectedItem.isNullOrEmpty()) {
+                    selectedItem
+                } else {
+                    null
+                },
+
+                "Outdoors Note" to if (customplaceEditText.visibility == View.VISIBLE && !editTextValue.isEmpty()) {
+                    editTextValue
+                } else {
+                    null
+                },
+
+                "Location" to if (circleItemAdapter.getSelectedLabels()
+                        .isNotEmpty()
+                ) circleItemAdapter.getSelectedLabels().joinToString(", ") else null,
+                "Position" to if (posCircleItemAdapter.getSelectedLabels()
+                        .isNotEmpty()
+                ) posCircleItemAdapter.getSelectedLabels().joinToString(", ") else null,
+                "Activity" to if (actCircleItemAdapter.getSelectedLabels()
+                        .isNotEmpty()
+                ) actCircleItemAdapter.getSelectedLabels().joinToString(", ") else null,
+                "Protection" to if (proCircleItemAdapter.getSelectedLabels()
+                        .isNotEmpty()
+                ) proCircleItemAdapter.getSelectedLabels().joinToString(", ") else null,
+                "GmiraD" to if (gmiraDSwitch.isChecked) {
+                    if (selectedGmiraDItem == "Other") customGmiraDEditText.text.toString()
+                    else selectedGmiraDItem
+                } else null,
+                "GmiraV" to if (gmiraVSwitch.isChecked) {
+                    if (selectedGmiraVItem == "Other") customGmiraVEditText.text.toString()
+                    else selectedGmiraVItem
+                } else null,
+                "toy" to if (toySwitch.isChecked) "Yes" else "No",
+                "custom" to if (customSwitch.isChecked) "Yes" else "No",
+                "ziunopoly" to if (ziunopolySwitch.isChecked) "Yes" else "No",
+                "period" to if (periodSwitch.isChecked) "Yes" else "No",
+                "watchporn" to if (watchpornSwitch.isChecked) "Yes" else "No",
+                "madeporn" to if (madepornSwitch.isChecked) "Yes" else "No",
+                "rating" to ratingValue.toString(),
+                "note" to notetextbox.text.toString() // Use "itemName" instead of "bookName"
+
+            )
+
+                // Only start the upload process here
+            if(this::selectedImageUri.isInitialized) {
+                // Assuming that you retrieve the session number like this:
+                db.collection("UsCount").document("sessionCounter")
+                    .get()
+                    .addOnSuccessListener { document ->
+                        val currentSessionNumber = document.getLong("count")?.toInt() ?: 0
+
+                        uploadImageToFirebase(currentSessionNumber) { imageUrl ->
+                            // Add the imageUrl to your data HashMap
+                            data["imageUrl"] = imageUrl
+                            saveData(data)
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        // Handle the error of retrieving the session number
+                        Log.e("FIRESTORE_ERROR", "Error retrieving session number", e)
+                    }
+            } else {
+                // Handle the scenario where an image hasn't been selected but the user pressed save
+            }
+
+
+            if (documentId != null) {
+                // If we have a documentId, we're editing, not creating a new entry
+                val docRef = db.collection("UsCount").document(documentId)
+                docRef.set(data)
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "Data updated successfully!", Toast.LENGTH_SHORT).show()
+
+                        // Navigate to MainActivity
+                        val intent = Intent(this, MainActivity::class.java)
+                        startActivity(intent)
+                        finish()  // Close the current activity
+                    }
+                    .addOnFailureListener { e ->
+                        // Handle any errors, perhaps display a Toast or log the error
+                        Log.e("FIRESTORE_ERROR", "Error updating document with ID: $documentId", e)
+                    }
+            } else {
+                db.collection("UsCount").document("sessionCounter")
+                    .get()
+                    .addOnSuccessListener { document ->
+                        val currentSessionNumber = document.getLong("count")?.toInt() ?: 0
+
+                        uploadImageToFirebase(currentSessionNumber) { imageUrl ->
+                            // Add the imageUrl to your data HashMap
+                            data["imageUrl"] = imageUrl
+                            saveData(data)
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        // Handle the error of retrieving the session number
+                        Log.e("FIRESTORE_ERROR", "Error retrieving session number", e)
+                    }
+            }
+
         }
     }
 
+
+    //Edit
+
+// This function gets called once an image is selected from the gallery
+lateinit var selectedImageUri: Uri
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == PICK_IMAGE_REQUEST_CODE && resultCode == Activity.RESULT_OK && data != null && data.data != null) {
+            selectedImageUri = data.data!!
+            Log.d("AddActivity", "Image Selected: $selectedImageUri")
+
+            // Set the image to the ImageButton for preview
+            val imageButtonUpload: ImageButton = findViewById(R.id.imageButtonUpload)
+            imageButtonUpload.setImageURI(selectedImageUri)
+
+        }
+    }
+
+    // The function to upload the image to Firebase Storage
+    private fun uploadImageToFirebase(sessionNumber: Int, callback: (imageUrl: String) -> Unit) {
+        // Constructing image name using the session number
+        val imageName = "Session $sessionNumber img.jpg"
+        val storageReference = FirebaseStorage.getInstance().reference.child("images/$imageName")
+        storageReference.putFile(selectedImageUri).addOnSuccessListener {
+            storageReference.downloadUrl.addOnSuccessListener { uri ->
+                callback(uri.toString())
+            }
+        }.addOnFailureListener {
+            Log.e("AddActivity", "Upload failed: ", it)
+            // Perhaps notify the user of the upload failure
+        }
+    }
+
+
+    private fun openImagePicker() {
+        val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+        startActivityForResult(intent, PICK_IMAGE_REQUEST_CODE)
+
+    }
+
+    companion object {
+        private const val PICK_IMAGE_REQUEST_CODE = 1001
+    }
+
+
+    // This function displays a time picker dialog.
     private fun showTimePickerDialog() {
+        // Get the current time using the Calendar class.
         val currentTime = Calendar.getInstance()
         val hour = currentTime.get(Calendar.HOUR_OF_DAY)
         val minute = currentTime.get(Calendar.MINUTE)
 
-        // Use the custom style for the time picker dialog
+        // Create and show a new TimePickerDialog with the current time as the default time.
+        // R.style.TimePickerTheme is a reference to a custom style you've defined somewhere else.
+        // "this" refers to the current instance of the AddActivity, which is used as the context and the listener for the dialog.
         TimePickerDialog(
             this,
-            R.style.TimePickerTheme, // Apply the custom style here
+            R.style.TimePickerTheme,
             this,
             hour,
             minute,
-            false
+            false // "false" means the time picker will use a 12-hour format with AM/PM. "true" would mean a 24-hour format.
         ).show()
     }
 
+    // This method is called when the user sets a time in the time picker dialog.
+    override fun onTimeSet(view: TimePicker?, hourOfDay: Int, minute: Int) {
+        // Format the selected hour and minute as a string in the format "HH:mm".
+        val formattedTime = String.format(Locale.getDefault(), "%02d:%02d", hourOfDay, minute)
+
+        // Get a reference to the TextInputEditText widget in the layout and set its text to the formatted time.
+        val timeTextInputEditText = findViewById<TextInputEditText>(R.id.timeTextInputEditText)
+        timeTextInputEditText.setText(formattedTime)
+    }
+
+    // This function displays a date picker dialog.
     private fun showDatePickerDialog() {
+        // Get the current date
         val currentDate = Calendar.getInstance()
         val year = currentDate.get(Calendar.YEAR)
         val month = currentDate.get(Calendar.MONTH)
         val day = currentDate.get(Calendar.DAY_OF_MONTH)
 
-        // Use the custom style for the date picker dialog
+        // Create and show a new instance of DatePickerDialog
         DatePickerDialog(
             this,
-            R.style.TimePickerTheme, // Apply the custom style here
-            this,
+            R.style.TimePickerTheme,
+            this,  // Callback is 'this', since we've implemented the OnDateSetListener interface in this Activity
             year,
             month,
             day
         ).show()
     }
 
-    // Implement the onTimeSet callback
-    override fun onTimeSet(view: TimePicker?, hourOfDay: Int, minute: Int) {
-        selectedTime.set(Calendar.HOUR_OF_DAY, hourOfDay)
-        selectedTime.set(Calendar.MINUTE, minute)
-
-        val timeFormat = SimpleDateFormat("hh:mm a", Locale.getDefault())
-        val formattedTime = timeFormat.format(selectedTime.time)
-        binding.timeTextInputEditText.setText(formattedTime)
-    }
-
-    // Implement the onDateSet callback
+    // This function gets triggered when a date is set using the DatePickerDialog
     override fun onDateSet(view: DatePicker?, year: Int, month: Int, dayOfMonth: Int) {
-        selectedDate.set(Calendar.YEAR, year)
-        selectedDate.set(Calendar.MONTH, month)
-        selectedDate.set(Calendar.DAY_OF_MONTH, dayOfMonth)
+        // Format the chosen date and set it on the date input text field
+        val selectedDate = Calendar.getInstance()
+        selectedDate.set(year, month, dayOfMonth)
 
-        val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-        val formattedDate = dateFormat.format(selectedDate.time)
-        binding.dateTextInputEditText.setText(formattedDate)
+        // Change the date pattern here
+        val formattedDate = SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(selectedDate.time)
+
+        val dateTextInputEditText = findViewById<TextInputEditText>(R.id.dateTextInputEditText)
+        dateTextInputEditText.setText(formattedDate)
     }
-
+    // This function gets triggered when a Duration is set using the DurationPickerDialog
     private fun showDurationPickerDialog() {
         val durationTextView: TextView = findViewById(R.id.durationTextView)
 
@@ -600,28 +744,38 @@ class AddActivity : AppCompatActivity(), TimePickerDialog.OnTimeSetListener,
             secondsPicker.maxValue = 59
             secondsPicker.wrapSelectorWheel = true
 
-            dialog.findViewById<Button>(R.id.btn_set).setOnClickListener {
+
+
+            dialog.findViewById<TextView>(R.id.btn_set).setOnClickListener {
                 val duration = String.format("%02d:%02d", minutesPicker.value, secondsPicker.value)
                 durationTextView.text = duration
                 dialog.dismiss()
             }
 
-            dialog.findViewById<Button>(R.id.btn_cancel).setOnClickListener {
+            dialog.findViewById<TextView>(R.id.btn_cancel).setOnClickListener {
                 dialog.dismiss()
             }
+
+            dialog.window?.setBackgroundDrawableResource(R.drawable.bg_greyround)
+
 
             dialog.show()
         }
     }
 
-
-
-
-
-
-
-    override fun onDestroy() {
-        super.onDestroy()
-        _binding = null
+    override fun onItemClick(position: Int, selectedLabels: List<String>) {
+        // Your existing logic for onItemClick
     }
+
+    override fun onOutdoorsClicked(isSelected: Boolean) {
+        val placeSpinner: Spinner = findViewById(R.id.placeSpinner)
+        val customplaceEditText: EditText = findViewById(R.id.customplaceEditText)
+
+        val visibility = if (isSelected) View.VISIBLE else View.GONE
+
+        placeSpinner.visibility = visibility
+        customplaceEditText.visibility = visibility
+    }
+
+
 }
